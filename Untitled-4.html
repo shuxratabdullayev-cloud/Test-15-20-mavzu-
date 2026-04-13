@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAXR MADAD KONSALT - Buxgalteriya Simulyatori</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for in-browser JSX parsing -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            light: '#4f46e5',
+                            DEFAULT: '#4338ca',
+                            dark: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; }
+        .option-btn { transition: all 0.2s ease-in-out; }
+        .option-btn:disabled { cursor: default; }
+        .fade-in { animation: fadeIn 0.4s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- ICONS (Inline SVG to avoid external deps) ---
+        const Icons = {
+            BookOpen: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>,
+            Calculator: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+            XCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>,
+            Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>,
+            TrendingUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
+        };
+
+        // --- DATABASE: 5 Topics, 10 Questions each (4 Theory, 3 Provodka, 3 Math) ---
+        // Constraints applied: Max 5 words per option, similar character length, real terms.
+        const quizData = [
+            {
+                id: 1,
+                title: "Aylanmadan olinadigan soliq",
+                icon: "Calculator",
+                questions: [
+                    // Theory (4)
+                    { q: "Soliq hisobotini 5 kun kechikib topshirdingiz. Korxona hisob raqami band qilindi. Nima noto'g'ri bajarildi?", type: "theory", answer: "Hisobot muddati qattiq buzilgan hisoblanadi.", options: ["Hisobot muddati qattiq buzilgan hisoblanadi.", "Soliq bazasi xato hisoblangan hisoblanadi.", "Imtiyoz hujjati to'liq kiritilmagan bo'ladi.", "Stavka summasi noto'g'ri olingan bo'ladi."] },
+                    { q: "Jami tushum 1 mlrd so'mdan oshib ketdi. Lekin buxgalter eski soliqni to'lashda davom etdi. Nima yetishmayapti?", type: "theory", answer: "QQS to'lovchisi maqomiga o'tilmagan qolgan.", options: ["QQS to'lovchisi maqomiga o'tilmagan qolgan.", "Foyda solig'i hisoboti muddatidan kechikkan.", "Aylanma soliq stavkasi noto'g'ri tanlangan.", "Daromadlar tarkibi noto'g'ri tasniflangan bo'lgan."] },
+                    { q: "Hisobot davrida xodimlar ish haqi xarajatlari soliq bazasidan chegirib tashlandi. Inspeksiya e'tiroz bildirdi. Nima noto'g'ri?", type: "theory", answer: "Aylanma soliqda xarajatlar chegirilmaydi mutlaqo.", options: ["Aylanma soliqda xarajatlar chegirilmaydi mutlaqo.", "Ish haqi summasi noto'g'ri hisoblangan.", "Soliq stavkasi yuqori qilib olingan.", "Mehnatga haq to'lash fondi kamaytirilgan."] },
+                    { q: "Ulgurji savdo korxonasi 4% stavkada soliq to'ladi. Qayta hisoblashda katta qarz kelib chiqdi. Qanday tuzatsak bo'ladi?", type: "theory", answer: "Soliq stavkasi to'g'ri tanlanishi zarur.", options: ["Soliq stavkasi to'g'ri tanlanishi zarur.", "Soliq bazasi qayta hisoblanishi zarur.", "Imtiyoz muddati qayta ko'rilishi zarur.", "Xarajatlar summasi qisqartirilishi talab etiladi."] },
+                    // Provodka (3)
+                    { q: "Aylanmadan olinadigan soliq byudjetga to'lab berildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 6810 — Kredit 5110 qilingan.", options: ["Debet 6810 — Kredit 5110 qilingan.", "Debet 5110 — Kredit 6810 qilingan.", "Debet 9810 — Kredit 6810 qilingan.", "Debet 6810 — Kredit 5010 qilingan."] },
+                    { q: "Hisobot davri uchun aylanma solig'i hisoblandi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 9810 — Kredit 6810 yozilgan.", options: ["Debet 9810 — Kredit 6810 yozilgan.", "Debet 6810 — Kredit 9810 yozilgan.", "Debet 9430 — Kredit 6810 yozilgan.", "Debet 9910 — Kredit 6810 yozilgan."] },
+                    { q: "Soliq organlari tomonidan aylanma solig'i bo'yicha penya hisoblandi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 9430 — Kredit 6990 shaklida.", options: ["Debet 9430 — Kredit 6990 shaklida.", "Debet 9810 — Kredit 6810 shaklida.", "Debet 6990 — Kredit 5110 shaklida.", "Debet 9910 — Kredit 6990 shaklida."] },
+                    // Math (3)
+                    { q: "Chakana savdoda tushum 100 mln so'm. Stavka 4%. To'lanadigan soliq qancha?", type: "math", answer: "To'rt million so'm hisoblangan miqdor.", options: ["To'rt million so'm hisoblangan miqdor.", "Qirq million so'm hisoblangan miqdor.", "O'n to'rt million so'm hisoblangan.", "Nol butun to'rt million miqdor."] },
+                    { q: "Soliq bazasi 50 mln so'm. Stavkasi 4%. Soliq summasi qancha?", type: "math", answer: "Ikki million so'm hisoblangan miqdor.", options: ["Ikki million so'm hisoblangan miqdor.", "Besh million so'm hisoblangan miqdor.", "Yigirma million so'm hisoblangan miqdor.", "Nol butun ikki million miqdor."] },
+                    { q: "Tushum 200 mln, qaytarilgan tovar 20 mln. Stavka 4%. Soliq qancha?", type: "math", answer: "Yetti butun ikki million so'm.", options: ["Yetti butun ikki million so'm.", "Sakkiz butun nol million so'm.", "Olti butun sakkiz million so'm.", "To'qqiz butun ikki million so'm."] }
+                ]
+            },
+            {
+                id: 2,
+                title: "Ishlab chiqarish xarajatlari",
+                icon: "Briefcase",
+                questions: [
+                    // Theory (4)
+                    { q: "Tsex uskunalari ta'mirlandi, lekin xarajatlar darhol moliyaviy natijaga olib borildi. Tayyor mahsulot tannarxi pasayib ketdi. Nima noto'g'ri?", type: "theory", answer: "Ishlab chiqarish tannarxiga kiritilmagan qolgan.", options: ["Ishlab chiqarish tannarxiga kiritilmagan qolgan.", "Davr xarajatlari asossiz ravishda oshirilgan.", "Ma'muriy xarajatlarga noto'g'ri olib borilgan.", "Sotish xarajatlari tarkibida noto'g'ri ko'rsatilgan."] },
+                    { q: "Ombordagi xomashyo keskin kamaydi, biroq sexda mahsulot yo'q. Dasturda katta tafovut yuzaga keldi. Nima yetishmayapti?", type: "theory", answer: "Ishlab chiqarishga berilishi rasmiylashtirilmay qolibdi.", options: ["Ishlab chiqarishga berilishi rasmiylashtirilmay qolibdi.", "Tovar moddiy zaxirasi o'g'irlab ketilgan.", "Asosiy vositalar qatoriga qo'shib yuborilgan.", "Boshqa xarajatlarga asossiz yozib yuborilgan."] },
+                    { q: "Direktorning ish haqi to'g'ridan-to'g'ri mahsulot tannarxiga qo'shib yuborildi. Foyda solig'i hisobotida xato chiqdi. Qanday tuzatsak bo'ladi?", type: "theory", answer: "Ma'muriy xarajatlar schyotiga o'tkazish kerak.", options: ["Ma'muriy xarajatlar schyotiga o'tkazish kerak.", "Sotish xarajatlari schyotiga o'tkazish kerak.", "Ishlab chiqarish yaroqsizligiga o'tkazish kerak.", "Kelgusi davr xarajatlariga o'tkazish kerak."] },
+                    { q: "Yaroqsiz mahsulot qiymati tayyor mahsulot tannarxida qolib ketdi. Rahbariyat asossiz yuqori daromad kutmoqda. Quyidagi fikrlarning qaysi biri to'g'ri emas?", type: "theory", answer: "Yaroqsiz mahsulot tannarxni doim oshiradi.", options: ["Yaroqsiz mahsulot tannarxni doim oshiradi.", "Yaroqsiz mahsulot xarajatlarga chegirib tashlanadi.", "Yaroqsiz mahsulot moddiy zararga aylanadi.", "Yaroqsiz mahsulot aybdor shaxsdan undiriladi."] },
+                    // Provodka (3)
+                    { q: "Asosiy ishlab chiqarishga ombordan xomashyo berildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 2010 — Kredit 1010 qilingan.", options: ["Debet 2010 — Kredit 1010 qilingan.", "Debet 1010 — Kredit 2010 qilingan.", "Debet 9420 — Kredit 1010 qilingan.", "Debet 2810 — Kredit 1010 qilingan."] },
+                    { q: "Asosiy ishlab chiqarish xodimlariga ish haqi hisoblandi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 2010 — Kredit 6710 qilingan.", options: ["Debet 2010 — Kredit 6710 qilingan.", "Debet 9420 — Kredit 6710 qilingan.", "Debet 6710 — Kredit 2010 qilingan.", "Debet 6710 — Kredit 5110 qilingan."] },
+                    { q: "Tayyor mahsulot omborga kirim qilindi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 2810 — Kredit 2010 qilingan.", options: ["Debet 2810 — Kredit 2010 qilingan.", "Debet 2010 — Kredit 2810 qilingan.", "Debet 9110 — Kredit 2810 qilingan.", "Debet 1010 — Kredit 2010 qilingan."] },
+                    // Math (3)
+                    { q: "Xomashyo 40 mln, ish haqi 10 mln. Umumishlab chiqarish xarajati 5 mln. Jami tannarx?", type: "math", answer: "Ellik besh million so'm bo'lgan.", options: ["Ellik besh million so'm bo'lgan.", "Qirq besh million so'm bo'lgan.", "Oltmish million so'm hisoblangan miqdor.", "Ellik million so'm hisoblangan miqdor."] },
+                    { q: "Asosiy xarajat 100 mln. Yaroqsiz mahsulot 2 mln. Sof tannarx qancha?", type: "math", answer: "To'qson sakkiz million so'm bo'lgan.", options: ["To'qson sakkiz million so'm bo'lgan.", "Yuz ikki million so'm bo'lgan.", "Yuz million so'm hisoblangan miqdor.", "To'qson million so'm hisoblangan miqdor."] },
+                    { q: "100 ta mahsulot tannarxi 500 ming. 1 ta mahsulot tannarxi qancha?", type: "math", answer: "Besh ming so'm hisoblangan miqdor.", options: ["Besh ming so'm hisoblangan miqdor.", "Ellik ming so'm hisoblangan miqdor.", "Besh yuz ming so'm bo'lgan.", "O'n ming so'm hisoblangan miqdor."] }
+                ]
+            },
+            {
+                id: 3,
+                title: "Moliyaviy natijalar va Foyda",
+                icon: "TrendingUp",
+                questions: [
+                    // Theory (4)
+                    { q: "Yil yakunida 9910 schyot yopilmadi. Balansda passiv va aktiv umuman tenglashmay qoldi. Nima noto'g'ri bajarildi?", type: "theory", answer: "Taqsimlanmagan foydaga o'tkazilmagan bo'lib qolgan.", options: ["Taqsimlanmagan foydaga o'tkazilmagan bo'lib qolgan.", "Zaxira kapitali noto'g'ri hisoblangan qolgan.", "Sof tushum asossiz ravishda kamaytirilgan.", "Davr xarajatlari to'liq qoplanmagan qolgan."] },
+                    { q: "Sotishdan olingan daromad 9010 schyotga emas, 9310 schyotga kiritildi. Asosiy faoliyat foydasi kamayib ketdi. Nima yetishmayapti?", type: "theory", answer: "Daromadni to'g'ri tasniflash yetishmay qolgan.", options: ["Daromadni to'g'ri tasniflash yetishmay qolgan.", "Soliq bazasini aniqlash yetishmay qolgan.", "Tannarxni to'g'ri hisoblash yetishmay qolgan.", "Xarajatlarni qoplash manbasi yetishmay qolgan."] },
+                    { q: "Dividendlar to'landi, lekin foyda solig'i ushlab qolinmadi. Byudjet oldida to'satdan katta qarz yuzaga keldi. Qanday tuzatsak bo'ladi?", type: "theory", answer: "Dividenddan daromad solig'i ushlanishi shart.", options: ["Dividenddan daromad solig'i ushlanishi shart.", "Foyda solig'i stavkasi kamaytirilishi shart.", "QQS summasi qayta hisoblanishi shart.", "Moliyaviy sanksiya summasi kamaytirilishi shart."] },
+                    { q: "Xizmat ko'rsatildi, ammo EHF (schet-faktura) keyingi oyda jo'natildi. O'tgan oydagi daromad sun'iy kamaydi. Quyidagi fikrlarning qaysi biri to'g'ri emas?", type: "theory", answer: "Daromad faqat pul tushganda olinadi.", options: ["Daromad faqat pul tushganda olinadi.", "Daromad xizmat ko'rsatilganda tan olinadi.", "EHF o'z vaqtida taqdim etilishi shart.", "Hisoblash usuli qoidasi qo'pol buzilgan."] },
+                    // Provodka (3)
+                    { q: "Tayyor mahsulot sotishdan olingan daromad tan olindi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 4010 — Kredit 9010 qilingan.", options: ["Debet 4010 — Kredit 9010 qilingan.", "Debet 9010 — Kredit 4010 qilingan.", "Debet 5110 — Kredit 9010 qilingan.", "Debet 9110 — Kredit 4010 qilingan."] },
+                    { q: "Sotilgan mahsulotning tannarxi hisobdan chiqarildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 9110 — Kredit 2810 qilingan.", options: ["Debet 9110 — Kredit 2810 qilingan.", "Debet 2810 — Kredit 9110 qilingan.", "Debet 9010 — Kredit 2810 qilingan.", "Debet 9420 — Kredit 2810 qilingan."] },
+                    { q: "Hisobot yili oxirida sof foyda taqsimlanmagan foydaga o'tkazildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 9910 — Kredit 8710 yozilgan.", options: ["Debet 9910 — Kredit 8710 yozilgan.", "Debet 8710 — Kredit 9910 yozilgan.", "Debet 9910 — Kredit 8810 yozilgan.", "Debet 8810 — Kredit 9910 yozilgan."] },
+                    // Math (3)
+                    { q: "Sotishdan daromad 100 mln, tannarx 60 mln. Yalpi foyda qancha?", type: "math", answer: "Qirq million so'm hisoblangan miqdor.", options: ["Qirq million so'm hisoblangan miqdor.", "Yuz oltmish million so'm bo'lgan.", "Oltmish million so'm hisoblangan miqdor.", "O'n million so'm hisoblangan miqdor."] },
+                    { q: "Yalpi foyda 40 mln, davr xarajatlari 15 mln. Asosiy foyda qancha?", type: "math", answer: "Yigirma besh million so'm bo'lgan.", options: ["Yigirma besh million so'm bo'lgan.", "Ellik besh million so'm bo'lgan.", "O'ttiz besh million so'm bo'lgan.", "O'n besh million so'm bo'lgan."] },
+                    { q: "Foyda 10 mln. Dividend stavkasi 10%. Soliq ushlanmasi qancha?", type: "math", answer: "Bir million so'm hisoblangan miqdor.", options: ["Bir million so'm hisoblangan miqdor.", "O'n million so'm hisoblangan miqdor.", "To'qqiz million so'm hisoblangan miqdor.", "Nol butun bir million miqdor."] }
+                ]
+            },
+            {
+                id: 4,
+                title: "Buxgalteriya balansi",
+                icon: "BookOpen",
+                questions: [
+                    // Theory (4)
+                    { q: "Kreditga tovar olindi, lekin faqat passivda qarz ko'paytirildi. Balans darhol qiyshayib qoldi. Nima noto'g'ri bajarildi?", type: "theory", answer: "Aktivdagi zaxiralar qismi ko'paytirilmagan qolgan.", options: ["Aktivdagi zaxiralar qismi ko'paytirilmagan qolgan.", "Ustav kapitali asossiz ravishda oshirilgan.", "Bankdagi pullar qismi noto'g'ri kamaytirilgan.", "Soliq qarzdorligi asossiz ravishda oshirilgan."] },
+                    { q: "Bankdan olingan uzoq muddatli kredit qisqa muddatli majburiyatlarga kiritildi. To'lov qobiliyati ko'rsatkichi yomonlashdi. Nima yetishmayapti?", type: "theory", answer: "Majburiyatlarni to'g'ri turkumlash yetishmay qolgan.", options: ["Majburiyatlarni to'g'ri turkumlash yetishmay qolgan.", "Aktivlarni to'g'ri baholash yetishmay qolgan.", "O'z kapitalini tasniflash yetishmay qolgan.", "Debitor qarzdorlikni aniqlash yetishmay qolgan."] },
+                    { q: "Asosiy vositalar eskirish summasiz, boshlang'ich qiymatda balansda ko'rsatildi. Korxona aktivlari sun'iy shishirildi. Qanday tuzatsak bo'ladi?", type: "theory", answer: "Qoldiq qiymati bo'yicha ko'rsatilishi shart.", options: ["Qoldiq qiymati bo'yicha ko'rsatilishi shart.", "Bozor qiymati bo'yicha ko'rsatilishi shart.", "Qayta baholash qiymatida ko'rsatilishi shart.", "Tugatish qiymati bo'yicha ko'rsatilishi shart."] },
+                    { q: "Taqsimlanmagan foyda passivda minus ishorasi bilan qoldi. Rahbar xavotirda. Quyidagi fikrlarning qaysi biri to'g'ri emas?", type: "theory", answer: "Korxona katta moliyaviy foyda ko'rmoqda.", options: ["Korxona katta moliyaviy foyda ko'rmoqda.", "Korxona yig'ilgan moliyaviy zarar ko'rmoqda.", "Joriy yilda xarajatlar tushumdan oshgan.", "O'z kapitali qiymati sezilarli kamaygan."] },
+                    // Provodka (3)
+                    { q: "Xaridorlardan avans puli kelib tushdi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 5110 — Kredit 6310 qilingan.", options: ["Debet 5110 — Kredit 6310 qilingan.", "Debet 6310 — Kredit 5110 qilingan.", "Debet 5110 — Kredit 4010 qilingan.", "Debet 4010 — Kredit 5110 qilingan."] },
+                    { q: "Yetkazib beruvchilarga pul to'lab berildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 6010 — Kredit 5110 qilingan.", options: ["Debet 6010 — Kredit 5110 qilingan.", "Debet 5110 — Kredit 6010 qilingan.", "Debet 4310 — Kredit 5110 qilingan.", "Debet 5110 — Kredit 4310 qilingan."] },
+                    { q: "Ta'sischilar ustav kapitaliga pul kiritdilar. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 5110 — Kredit 4610 qilingan.", options: ["Debet 5110 — Kredit 4610 qilingan.", "Debet 4610 — Kredit 5110 qilingan.", "Debet 5110 — Kredit 8330 qilingan.", "Debet 8330 — Kredit 5110 qilingan."] },
+                    // Math (3)
+                    { q: "Aktiv 500 mln. Majburiyat 200 mln. O'z kapitali qancha?", type: "math", answer: "Uch yuz million so'm bo'lgan.", options: ["Uch yuz million so'm bo'lgan.", "Yetti yuz million so'm bo'lgan.", "Ikki yuz million so'm bo'lgan.", "Besh yuz million so'm bo'lgan."] },
+                    { q: "Ustav kapitali 10 mln. Foyda 5 mln. Jami kapital qancha?", type: "math", answer: "O'n besh million so'm bo'lgan.", options: ["O'n besh million so'm bo'lgan.", "Besh million so'm hisoblangan miqdor.", "Ellik million so'm hisoblangan miqdor.", "O'n million so'm hisoblangan miqdor."] },
+                    { q: "Kassada 5 mln, bankda 45 mln. Jami pul mablag'lari?", type: "math", answer: "Ellik million so'm hisoblangan miqdor.", options: ["Ellik million so'm hisoblangan miqdor.", "Qirq million so'm hisoblangan miqdor.", "Qirq besh million so'm bo'lgan.", "Besh million so'm hisoblangan miqdor."] }
+                ]
+            },
+            {
+                id: 5,
+                title: "Asosiy vositalar va Amortizatsiya",
+                icon: "CheckCircle",
+                questions: [
+                    // Theory (4)
+                    { q: "Yangi kompyuter xarid qilindi, biroq darhol davr xarajatiga chiqarildi. Asosiy vosita schyotlari bo'sh qoldi. Nima noto'g'ri bajarildi?", type: "theory", answer: "01-schyotlar guruhiga kirim qilinmagan qolgan.", options: ["01-schyotlar guruhiga kirim qilinmagan qolgan.", "10-schyotlar guruhiga kirim qilinmagan qolgan.", "20-schyotlar guruhiga kirim qilinmagan qolgan.", "94-schyotlar guruhiga kirim qilinmagan qolgan."] },
+                    { q: "Mashina sotib olindi, lekin bir yildan beri amortizatsiya hisoblanmadi. Foyda asossiz oshib ketdi. Nima yetishmayapti?", type: "theory", answer: "Eskirish summasini oylik hisoblash yetishmayapti.", options: ["Eskirish summasini oylik hisoblash yetishmayapti.", "Ta'mirlash xarajatlarini oylik hisoblash yetishmayapti.", "Soliq summasini oylik hisoblash yetishmayapti.", "Qayta baholashni oylik hisoblash yetishmayapti."] },
+                    { q: "Asosiy vosita sotildi, lekin qoldiq qiymati hisobdan chiqarilmadi. Balansda yo'q mol-mulk osilib yotibdi. Qanday tuzatsak bo'ladi?", type: "theory", answer: "Chiqib ketishini to'liq rasmiylashtirish kerak.", options: ["Chiqib ketishini to'liq rasmiylashtirish kerak.", "Qayta baholashini to'liq rasmiylashtirish kerak.", "Amortizatsiyasini to'liq rasmiylashtirish kerak.", "Kapitallashuvini to'liq rasmiylashtirish kerak."] },
+                    { q: "Eskirish summasi yillik stavka o'rniga faqat bir marta chegirildi. Aktiv qiymati tez orada nolga tushdi. Quyidagi fikrlarning qaysi biri to'g'ri emas?", type: "theory", answer: "Amortizatsiya faqat bir marta hisoblanadi.", options: ["Amortizatsiya faqat bir marta hisoblanadi.", "Amortizatsiya har oyda muntazam hisoblanadi.", "Amortizatsiya foydalanish muddatiga mutanosib taqsimlanadi.", "Amortizatsiya mahsulot tannarxiga asta qo'shiladi."] },
+                    // Provodka (3)
+                    { q: "Yetkazib beruvchidan asosiy vosita kirim qilindi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 0820 — Kredit 6010 qilingan.", options: ["Debet 0820 — Kredit 6010 qilingan.", "Debet 0110 — Kredit 6010 qilingan.", "Debet 6010 — Kredit 0820 qilingan.", "Debet 0110 — Kredit 5110 qilingan."] },
+                    { q: "Ma'muriyat binosi uchun amortizatsiya hisoblandi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 9420 — Kredit 0220 qilingan.", options: ["Debet 9420 — Kredit 0220 qilingan.", "Debet 2010 — Kredit 0220 qilingan.", "Debet 0220 — Kredit 9420 qilingan.", "Debet 9430 — Kredit 0220 qilingan."] },
+                    { q: "Asosiy vosita foydalanishga topshirildi. Qaysi o'tkazma to'g'ri?", type: "provodka", answer: "Debet 0120 — Kredit 0820 qilingan.", options: ["Debet 0120 — Kredit 0820 qilingan.", "Debet 0820 — Kredit 0120 qilingan.", "Debet 0120 — Kredit 6010 qilingan.", "Debet 1010 — Kredit 0820 qilingan."] },
+                    // Math (3)
+                    { q: "Uskuna 120 mln. Foydalanish muddati 10 yil. Yillik eskirish?", type: "math", answer: "O'n ikki million so'm hisoblangan.", options: ["O'n ikki million so'm hisoblangan.", "Yigirma million so'm hisoblangan miqdor.", "Bir butun ikki million so'm.", "O'n million so'm hisoblangan miqdor."] },
+                    { q: "Boshlang'ich qiymat 50 mln. Yig'ilgan eskirish 20 mln. Qoldiq qiymat?", type: "math", answer: "O'ttiz million so'm bo'lgan.", options: ["O'ttiz million so'm bo'lgan.", "Yetti million so'm bo'lgan.", "Qirq million so'm hisoblangan miqdor.", "Yigirma million so'm hisoblangan miqdor."] },
+                    { q: "Yillik eskirish 12 mln. Oylik eskirish summasi qancha bo'ladi?", type: "math", answer: "Bir million so'm hisoblangan miqdor.", options: ["Bir million so'm hisoblangan miqdor.", "O'n ikki million so'm hisoblangan.", "O'n million so'm hisoblangan miqdor.", "Ikki million so'm hisoblangan miqdor."] }
+                ]
+            }
+        ];
+
+        // --- HELPER FUNCTION ---
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // --- COMPONENTS ---
+
+        function App() {
+            const [screen, setScreen] = useState('home'); // home, topics, quiz, results
+            const [selectedTopicId, setSelectedTopicId] = useState(null);
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            
+            // For Quiz State
+            const [shuffledOptions, setShuffledOptions] = useState([]);
+            const [selectedAnswer, setSelectedAnswer] = useState(null);
+            const [isChecking, setIsChecking] = useState(false);
+
+            const activeTopic = useMemo(() => 
+                quizData.find(t => t.id === selectedTopicId), [selectedTopicId]
+            );
+
+            // Prepare question when index changes
+            useEffect(() => {
+                if (screen === 'quiz' && activeTopic) {
+                    const currentQuestion = activeTopic.questions[currentQIndex];
+                    setShuffledOptions(shuffleArray(currentQuestion.options));
+                    setSelectedAnswer(null);
+                    setIsChecking(false);
+                }
+            }, [currentQIndex, screen, activeTopic]);
+
+            const startQuiz = (topicId) => {
+                setSelectedTopicId(topicId);
+                setCurrentQIndex(0);
+                setScore(0);
+                setScreen('quiz');
+            };
+
+            const handleAnswer = (option) => {
+                if (isChecking) return;
+                setSelectedAnswer(option);
+                setIsChecking(true);
+
+                const currentQuestion = activeTopic.questions[currentQIndex];
+                if (option === currentQuestion.answer) {
+                    setScore(prev => prev + 1);
+                }
+
+                setTimeout(() => {
+                    if (currentQIndex < activeTopic.questions.length - 1) {
+                        setCurrentQIndex(prev => prev + 1);
+                    } else {
+                        setScreen('results');
+                    }
+                }, 1500); // Wait 1.5s to show correct/incorrect colors
+            };
+
+            const resetApp = () => {
+                setScreen('topics');
+                setSelectedTopicId(null);
+                setCurrentQIndex(0);
+                setScore(0);
+            };
+
+            // --- SCREENS ---
+
+            const renderHome = () => (
+                <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-4 fade-in">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full border-t-4 border-brand-DEFAULT">
+                        <h1 className="text-3xl font-bold text-brand-dark mb-2">FAXR MADAD KONSALT</h1>
+                        <p className="text-gray-500 mb-8 uppercase tracking-widest text-sm font-semibold">O'quv Markazi</p>
+                        
+                        <div className="w-24 h-24 bg-brand-light/10 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-DEFAULT">
+                            <Icons.BookOpen />
+                        </div>
+
+                        <h2 className="text-2xl font-bold text-slate-800 mb-4">Buxgalteriya Simulyatori</h2>
+                        <p className="text-slate-600 mb-8">
+                            Amaliy buxgalteriya yozuvlari, soliq hisob-kitoblari va nazariy bilimlaringizni sinab ko'ring.
+                        </p>
+                        <button 
+                            onClick={() => setScreen('topics')}
+                            className="w-full bg-brand-DEFAULT hover:bg-brand-dark text-white font-bold py-4 px-8 rounded-xl transition-colors shadow-lg hover:shadow-xl"
+                        >
+                            Bilimni sinashni boshlash
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const renderTopics = () => (
+                <div className="max-w-4xl mx-auto py-12 px-4 fade-in">
+                    <div className="text-center mb-10">
+                        <h2 className="text-sm font-bold text-brand-DEFAULT uppercase tracking-wider mb-2">FAXR MADAD KONSALT</h2>
+                        <h1 className="text-3xl font-bold text-slate-800">Mavzuni tanlang</h1>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {quizData.map((topic) => {
+                            const IconComp = Icons[topic.icon];
+                            return (
+                                <button 
+                                    key={topic.id}
+                                    onClick={() => startQuiz(topic.id)}
+                                    className="bg-white p-6 rounded-2xl shadow-md hover:shadow-xl transition-all border border-slate-100 hover:border-brand-light flex flex-col items-center text-center group"
+                                >
+                                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-brand-DEFAULT mb-4 group-hover:bg-brand-DEFAULT group-hover:text-white transition-colors">
+                                        <IconComp />
+                                    </div>
+                                    <h3 className="font-bold text-slate-800 text-lg mb-2">{topic.title}</h3>
+                                    <p className="text-slate-500 text-sm">10 ta amaliy savol</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+
+            const renderQuiz = () => {
+                if (!activeTopic) return null;
+                const currentQuestion = activeTopic.questions[currentQIndex];
+                const progress = ((currentQIndex) / activeTopic.questions.length) * 100;
+
+                // Determine question type label
+                let typeLabel = "";
+                let typeColor = "";
+                if(currentQuestion.type === "theory") { typeLabel = "Nazariya"; typeColor = "bg-blue-100 text-blue-700"; }
+                if(currentQuestion.type === "provodka") { typeLabel = "O'tkazma"; typeColor = "bg-purple-100 text-purple-700"; }
+                if(currentQuestion.type === "math") { typeLabel = "Hisob-kitob"; typeColor = "bg-orange-100 text-orange-700"; }
+
+                return (
+                    <div className="max-w-2xl mx-auto py-8 px-4 fade-in">
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="font-bold text-slate-600 text-sm">{activeTopic.title}</h2>
+                            <span className="font-bold text-brand-DEFAULT bg-brand-light/10 py-1 px-3 rounded-full text-sm">
+                                {currentQIndex + 1} / {activeTopic.questions.length}
+                            </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-200 h-2 rounded-full mb-8 overflow-hidden">
+                            <div className="bg-brand-DEFAULT h-2 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                        </div>
+
+                        {/* Question Card */}
+                        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-6 border border-slate-100">
+                            <div className="flex justify-between items-start mb-4">
+                                <span className={`text-xs font-bold uppercase tracking-wider py-1 px-2 rounded ${typeColor}`}>
+                                    {typeLabel}
+                                </span>
+                            </div>
+                            <h3 className="text-xl md:text-2xl font-semibold text-slate-800 leading-snug">
+                                {currentQuestion.q}
+                            </h3>
+                        </div>
+
+                        {/* Options */}
+                        <div className="space-y-3">
+                            {shuffledOptions.map((option, index) => {
+                                let btnClass = "w-full text-left p-4 rounded-xl border-2 transition-all font-medium text-slate-700 option-btn ";
+                                
+                                if (!isChecking) {
+                                    btnClass += "border-slate-200 hover:border-brand-DEFAULT hover:bg-slate-50 bg-white";
+                                } else {
+                                    // Checking state logic
+                                    if (option === currentQuestion.answer) {
+                                        btnClass += "border-green-500 bg-green-50 text-green-800"; // Correct answer always turns green
+                                    } else if (option === selectedAnswer && option !== currentQuestion.answer) {
+                                        btnClass += "border-red-500 bg-red-50 text-red-800"; // Selected wrong answer turns red
+                                    } else {
+                                        btnClass += "border-slate-200 bg-white opacity-50"; // Others fade
+                                    }
+                                }
+
+                                const letters = ['A', 'B', 'C', 'D'];
+
+                                return (
+                                    <button 
+                                        key={index}
+                                        disabled={isChecking}
+                                        onClick={() => handleAnswer(option)}
+                                        className={btnClass}
+                                    >
+                                        <div className="flex items-center">
+                                            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mr-4 text-sm font-bold text-slate-500">
+                                                {letters[index]}
+                                            </span>
+                                            <span>{option}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderResults = () => {
+                const total = activeTopic.questions.length;
+                const percentage = Math.round((score / total) * 100);
+                
+                let message = "";
+                let IconRes = Icons.CheckCircle;
+                let colorClass = "text-green-500";
+                
+                if (percentage >= 80) {
+                    message = "Ajoyib natija! Siz buxgalteriya sir-asrorlarini yaxshi o'zlashtirgansiz.";
+                } else if (percentage >= 50) {
+                    message = "Yaxshi! Lekin bilimingizni yana biroz mustahkamlashingiz kerak.";
+                    IconRes = Icons.TrendingUp;
+                    colorClass = "text-orange-500";
+                } else {
+                    message = "Qayta urinib ko'ring. Xatolardan o'rganish — eng yaxshi tajribadir.";
+                    IconRes = Icons.XCircle;
+                    colorClass = "text-red-500";
+                }
+
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 fade-in">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center border border-slate-100">
+                            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Natija</h2>
+                            
+                            <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 bg-slate-50 ${colorClass}`}>
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+
+                            <h3 className="text-4xl font-bold text-slate-800 mb-2">{score} / {total}</h3>
+                            <p className="text-lg font-semibold text-slate-600 mb-4">{percentage}% To'g'ri javob</p>
+                            
+                            <p className="text-slate-500 mb-8">{message}</p>
+
+                            <button 
+                                onClick={resetApp}
+                                className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 px-8 rounded-xl transition-colors shadow-lg"
+                            >
+                                Boshqa mavzuni tanlash
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+                    {/* Simple Header */}
+                    <header className="bg-white shadow-sm py-4 px-6 flex justify-between items-center border-b border-slate-200">
+                        <div className="flex items-center space-x-2 text-brand-DEFAULT font-bold text-lg tracking-tight cursor-pointer" onClick={() => setScreen('home')}>
+                            <Icons.BookOpen />
+                            <span>FAXR MADAD KONSALT</span>
+                        </div>
+                        {screen !== 'home' && (
+                            <button onClick={() => setScreen('home')} className="text-sm text-slate-500 hover:text-brand-DEFAULT font-medium transition-colors">
+                                Bosh sahifa
+                            </button>
+                        )}
+                    </header>
+
+                    {/* Main Content Area */}
+                    <main className="flex-grow">
+                        {screen === 'home' && renderHome()}
+                        {screen === 'topics' && renderTopics()}
+                        {screen === 'quiz' && renderQuiz()}
+                        {screen === 'results' && renderResults()}
+                    </main>
+                    
+                    {/* Footer */}
+                    <footer className="py-6 text-center text-slate-400 text-sm">
+                        © {new Date().getFullYear()} FAXR MADAD KONSALT. Buxgalteriya Simulyatori.
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
